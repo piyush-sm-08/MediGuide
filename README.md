@@ -58,12 +58,12 @@ http://127.0.0.1:8000/docs
 MediGuide is not a medical diagnosis tool.
 It is intended for educational and informational purposes only.
 
-📌 Status
+**📌 Status**
 
 🚧 Under active development
 More features and improvements coming soon.
 
-⭐ Future Improvements (Planned)
+## ⭐ Future Improvements (Planned)
 
 - Role-based access control
 - Better document chunking & retrieval
