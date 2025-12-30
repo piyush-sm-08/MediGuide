@@ -11,7 +11,7 @@ MONGO_URI = os.getenv("MONGODB_URI")
 DB_NAME = os.getenv("MONGODB_DB_NAME")
 
 if not MONGO_URI or not DB_NAME:
-    raise ValueError("❌ MongoDB environment variables not set")
+    raise ValueError("❌ MongoDB environment variables not set.")
 
 try:
     client = MongoClient(
@@ -23,10 +23,10 @@ try:
 
     # Test connection
     client.admin.command("ping")
-    print("✅ MongoDB connected successfully")
+    print("✅ MongoDB connected successfully ..")
 
 except ConnectionFailure as e:
-    print("❌ MongoDB connection failed")
+    print("❌ MongoDB connection failed !")
     raise e
 
 # Select database
