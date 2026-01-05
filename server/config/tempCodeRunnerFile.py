@@ -36,5 +36,3 @@ db = client[DB_NAME]
 users_collection = db["users"]
 appointments_collection = db["appointments"]
 doctors_collection = db["doctors"]
-
-

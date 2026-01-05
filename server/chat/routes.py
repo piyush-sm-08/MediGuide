@@ -8,15 +8,17 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 class ChatRequest(BaseModel):
-    message: str
+    query: str
+    top_k: int = 5
 
 
 @router.post("/")
-async def chat(
+def chat(
     req: ChatRequest,
     user=Depends(authentication)
 ):
-    return await answer_query(
-        query=req.message,
+    return answer_query(
+        query=req.query,
+        top_k=req.top_k,
         role=user["role"]
     )
