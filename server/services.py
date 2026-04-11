@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Set Keras 2 compatibility for Transformers before any other imports
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+
 # Load environment variables from server/.env
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)

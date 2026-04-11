@@ -1,12 +1,14 @@
 import streamlit as st
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 import requests
 from requests.auth import HTTPBasicAuth
 
-load_dotenv()
+root_dir = Path(__file__).resolve().parent.parent
+load_dotenv(root_dir / ".env")
 
-URL = os.getenv("BASE_URL")
+URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
 
 st.set_page_config(page_title="MEDICAL HEALTHCARE RAG CHATBOT !!", layout="centered")
 
