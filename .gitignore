@@ -20,11 +20,17 @@ ENV/
 .env
 
 # Chroma Vector Database
-chroma_db/
+chroma_db/*
+!chroma_db/README.md
+server/chroma_db/*
+!server/chroma_db/README.md
 *.sqlite3
 
 # Uploaded Files / User Data
-uploaded_docs/
+uploaded_docs/*
+!uploaded_docs/README.md
+server/uploaded_docs/*
+!server/uploaded_docs/README.md
 
 # Logs
 *.log
