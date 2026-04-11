@@ -1,27 +1,33 @@
-# Web framewroks
+# Web frameworks
 fastapi
 uvicorn[standard]
-python-multipart 
+python-multipart
 
-# langchain LLM
+# LangChain LLM
 langchain
 langchain-community
 langchain-core
 langchain-ollama
 
-# vectorstore
-chromadb   
+# Vector store
+chromadb
+langchain-chroma
+
+# Text splitting
+langchain-text-splitters
 
 # Embeddings
 sentence-transformers   # all-MiniLM-L6-v2
+langchain-huggingface
+tf-keras                # Keras 3 backwards compatibility
 
 # PDF parsing
 pypdf
 
-# Environment Variables : 
+# Environment Variables
 python-dotenv
 
-# Typing 
+# Typing
 pydantic
 requests
 tqdm
@@ -29,3 +35,6 @@ tqdm
 # Authentication
 pymongo
 bcrypt
+
+# TLS certificates (for MongoDB Atlas)
+certifi

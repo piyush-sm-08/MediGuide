@@ -1,63 +1,15 @@
-import os
+"""
+Document vectorization and PDF summarization utilities.
+Uses shared services for embeddings, vectorstore, and LLM access.
+"""
+
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Load environment variables
-env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
-
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
-CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
-UPLOAD_DIR = "./uploaded_docs"
-
-if not EMBEDDING_MODEL or not CHROMA_PERSIST_DIR:
-    raise RuntimeError("EMBEDDING_MODEL or CHROMA_PERSIST_DIR not set")
-
-if not OLLAMA_MODEL or not OLLAMA_BASE_URL:
-    raise RuntimeError("OLLAMA_MODEL or OLLAMA_BASE_URL not set")
-
-# Ensure upload directory exists
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# Lazy initialization of embeddings and vectorstore
-embeddings = None
-vectorstore = None
-llm = None
-
-def get_embeddings():
-    global embeddings
-    if embeddings is None:
-        from langchain_huggingface import HuggingFaceEmbeddings
-        embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
-    return embeddings
-
-def get_vectorstore():
-    global vectorstore
-    if vectorstore is None:
-        try:
-            from langchain_chroma import Chroma
-            vectorstore = Chroma(
-                persist_directory=CHROMA_PERSIST_DIR,
-                embedding_function=get_embeddings()
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to initialize Chroma vector store: {exc}") from exc
-    return vectorstore
-
-def get_llm():
-    global llm
-    if llm is None:
-        try:
-            from langchain_ollama import OllamaLLM
-            llm = OllamaLLM(
-                model=OLLAMA_MODEL,
-                base_url=OLLAMA_BASE_URL
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to initialize Ollama LLM: {exc}") from exc
-    return llm
+from ..services import (
+    get_vectorstore,
+    invoke_llm,
+    UPLOAD_DIR,
+)
 
 
 def save_upload_file(uploaded_file) -> Path:
@@ -112,17 +64,9 @@ def load_vectorstore(file_path: str, filename: str, role: str, doc_id: str):
             )
             progress.update(len(texts))
 
-        get_vectorstore().persist()
         print(f"Upload complete for {filename}")
     except Exception as exc:
         raise RuntimeError(f"Failed to save document vectors: {exc}") from exc
-
-
-def invoke_llm(prompt: str) -> str:
-    try:
-        return get_llm().invoke(prompt)
-    except Exception as exc:
-        raise RuntimeError(f"LLM invocation failed: {exc}") from exc
 
 
 def summarize_pdf(file_path: str) -> str:

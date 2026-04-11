@@ -1,11 +1,15 @@
 import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
-import certifi
 
 load_dotenv()
-uri =os.getenv("MONGODB_URI")
+uri = os.getenv("MONGODB_URI")
 
-client = MongoClient(uri, tls=True, tlsCAFile=certifi.where())
+if uri and "mongodb+srv" in uri:
+    import certifi
+    client = MongoClient(uri, tls=True, tlsCAFile=certifi.where())
+else:
+    client = MongoClient(uri)
+
 client.admin.command("ping")
 print("CONNECTED")

@@ -6,7 +6,7 @@ from ..auth.routes import authentication
 from ..config.db import reports_collection
 from .vector import load_vectorstore, summarize_pdf
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/docs", tags=["Documents"])
 
@@ -23,7 +23,7 @@ def save_report_metadata(doc_id: str, filename: str, owner: str, role: str, summ
         "role": role,
         "summary": summary,
         "type": report_type,
-        "uploaded_at": datetime.utcnow().isoformat()
+        "uploaded_at": datetime.now(timezone.utc).isoformat()
     })
 
 
@@ -88,7 +88,7 @@ async def upload_medical_report(
     try:
         summary = summarize_pdf(str(save_path))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Report summarization failed: {str(e)}")
+        summary = f"[Summarization unavailable] Could not generate summary: {str(e)}"
 
     vector_warning = None
     try:

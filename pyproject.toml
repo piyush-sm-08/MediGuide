@@ -1,7 +1,7 @@
 [project]
 name = "mediguide"
 version = "0.1.0"
-description = "Add your description here"
+description = "AI-powered medical assistant using FastAPI, LangChain, and ChromaDB for RAG-based healthcare Q&A"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
