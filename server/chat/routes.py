@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from auth.routes import authentication
-from chat.chat_query import answer_query
+from ..auth.routes import authentication
+from .chat_query import answer_query
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -13,7 +13,7 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/")
-def chat(
+def chat_endpoint(
     req: ChatRequest,
     user=Depends(authentication)
 ):

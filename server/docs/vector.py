@@ -1,89 +1,184 @@
-
 import os
-import time
 from pathlib import Path
 from dotenv import load_dotenv
-from tqdm.auto import tqdm
-
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
-
-load_dotenv()
 
 # Load environment variables
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
 UPLOAD_DIR = "./uploaded_docs"
 
-# Make sure upload directory exists
+if not EMBEDDING_MODEL or not CHROMA_PERSIST_DIR:
+    raise RuntimeError("EMBEDDING_MODEL or CHROMA_PERSIST_DIR not set")
+
+if not OLLAMA_MODEL or not OLLAMA_BASE_URL:
+    raise RuntimeError("OLLAMA_MODEL or OLLAMA_BASE_URL not set")
+
+# Ensure upload directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Initialize embeddings
-embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+# Lazy initialization of embeddings and vectorstore
+embeddings = None
+vectorstore = None
+llm = None
 
-# Initialize or load Chroma vector store
-if Path(CHROMA_PERSIST_DIR).exists() and any(Path(CHROMA_PERSIST_DIR).iterdir()):
-    # Load existing Chroma database
-    vectorstore = Chroma(
-        persist_directory=CHROMA_PERSIST_DIR,
-        embedding_function=embeddings
+def get_embeddings():
+    global embeddings
+    if embeddings is None:
+        from langchain_huggingface import HuggingFaceEmbeddings
+        embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    return embeddings
+
+def get_vectorstore():
+    global vectorstore
+    if vectorstore is None:
+        try:
+            from langchain_chroma import Chroma
+            vectorstore = Chroma(
+                persist_directory=CHROMA_PERSIST_DIR,
+                embedding_function=get_embeddings()
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to initialize Chroma vector store: {exc}") from exc
+    return vectorstore
+
+def get_llm():
+    global llm
+    if llm is None:
+        try:
+            from langchain_ollama import OllamaLLM
+            llm = OllamaLLM(
+                model=OLLAMA_MODEL,
+                base_url=OLLAMA_BASE_URL
+            )
+        except Exception as exc:
+            raise RuntimeError(f"Failed to initialize Ollama LLM: {exc}") from exc
+    return llm
+
+
+def save_upload_file(uploaded_file) -> Path:
+    save_path = Path(UPLOAD_DIR) / uploaded_file.filename
+    content = uploaded_file.file.read()
+    save_path.write_bytes(content)
+    return save_path
+
+
+def load_vectorstore(file_path: str, filename: str, role: str, doc_id: str):
+    """
+    Loads a PDF file, splits it into chunks,
+    embeds the text, and stores it in ChromaDB.
+    """
+    from langchain_community.document_loaders import PyPDFLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from tqdm.auto import tqdm
+
+    loader = PyPDFLoader(file_path)
+    documents = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=100
     )
-else:
-    # Create a new Chroma database
-    vectorstore = Chroma(
-        persist_directory=CHROMA_PERSIST_DIR,
-        embedding_function=embeddings
-    )
-    vectorstore.persist()
+    chunks = splitter.split_documents(documents)
+
+    if not chunks:
+        return
+
+    texts = [chunk.page_content for chunk in chunks]
+    ids = [f"{doc_id}-{i}" for i in range(len(chunks))]
+    metadatas = [
+        {
+            "source": filename,
+            "doc_id": doc_id,
+            "role": role,
+            "page": chunk.metadata.get("page", 0)
+        }
+        for chunk in chunks
+    ]
+
+    print(f"Processing {filename}")
+    print(f"Total chunks: {len(texts)}")
+
+    try:
+        with tqdm(total=len(texts), desc="Uploading to ChromaDB") as progress:
+            get_vectorstore().add_texts(
+                texts=texts,
+                metadatas=metadatas,
+                ids=ids
+            )
+            progress.update(len(texts))
+
+        get_vectorstore().persist()
+        print(f"Upload complete for {filename}")
+    except Exception as exc:
+        raise RuntimeError(f"Failed to save document vectors: {exc}") from exc
 
 
+def invoke_llm(prompt: str) -> str:
+    try:
+        return get_llm().invoke(prompt)
+    except Exception as exc:
+        raise RuntimeError(f"LLM invocation failed: {exc}") from exc
 
-def load_vectorstore(uploaded_files,role:str, doc_id:str):
-    embedded_model =  HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-    for file in uploaded_files:
-        save_path = Path(UPLOAD_DIR)/file.filename
+def summarize_pdf(file_path: str) -> str:
+    from langchain_community.document_loaders import PyPDFLoader
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-        with open(save_path , 'wb') as f:
-            f.write(file.file.read())
-
-        loader = PyPDFLoader(str(save_path))
+    try:
+        loader = PyPDFLoader(file_path)
         documents = loader.load()
-        
-        splitter = RecursiveCharacterTextSplitter(chunk_size = 500 , chunk_overlap = 100)
-        chunks = splitter.split_documents(documents)
+    except Exception as exc:
+        return f"Unable to read PDF for summary: {exc}"
 
-        texts = [chunk.page_content for chunk in chunks]
-        ids = [f"{doc_id}-{i}" for i in range(len(chunks))]
-        metadata = [
-            {
-                "source" : file.filename,
-                "doc_id" : doc_id,
-                "role" : role,
-                "page" : chunk.metadata.get("page",0)
-            }
-            for i, chunk in enumerate(chunks)
-        ]               
- 
-        print(f"Embeddings {len(texts)} chunks ..")
-        embeddings_vectors = embedded_model.embed_documents(texts)
+    if not documents:
+        return "No content found in the uploaded PDF."
 
-        print("Uploading to ChromaDB")
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1200,
+        chunk_overlap=100
+    )
+    chunks = splitter.split_documents(documents)
 
-        vectors_to_upsert = [
-            {
-                "id": ids[i],
-                "embedding": embeddings[i],
-                "metadata": metadata[i]
-            }
-            for i in range(len(embeddings))
-        ]
- 
-        with tqdm(total=len(vectors_to_upsert), desc="Upserting to ChromaDB") as progress:
-            for vector in vectors_to_upsert:
-                vectorstore.upsert([vector])
-                progress.update(1)
+    if not chunks:
+        return "Unable to extract text from the uploaded PDF."
 
-        print(f"Upload complete for {file.filename}")  
+    summaries = []
+    for index, chunk in enumerate(chunks):
+        prompt = f"""
+You are a medical report summarization assistant.
+Read the following excerpt from a medical report and create a concise summary in plain language.
+Do not hallucinate. Preserve the meaning exactly.
+
+Excerpt:
+{chunk.page_content}
+"""
+        try:
+            summaries.append(invoke_llm(prompt))
+        except RuntimeError as llm_error:
+            fallback = chunk.page_content.strip()
+            if len(fallback) > 500:
+                fallback = fallback[:500] + "..."
+            summaries.append(
+                f"[AI unavailable] Extracted text fallback:\n{fallback}"
+            )
+
+    if len(summaries) == 1:
+        return summaries[0]
+
+    joined = "\n\n".join(summaries)
+    final_prompt = f"""
+You have the following partial summaries of a medical report. Combine them into one clear and concise summary.
+
+Partial summaries:
+{joined}
+"""
+
+    try:
+        return invoke_llm(final_prompt)
+    except RuntimeError:
+        return joined
