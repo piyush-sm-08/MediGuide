@@ -7,8 +7,10 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Set Keras 2 compatibility for Transformers before any other imports
-os.environ["TF_USE_LEGACY_KERAS"] = "1"
+# Suppress TensorFlow/Keras warnings before any imports
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # Suppress INFO and WARNING logs
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"  # Disable oneDNN optimizations
+os.environ["TF_USE_LEGACY_KERAS"] = "1"  # Keras 2 compatibility
 
 # Load environment variables from server/.env
 env_path = Path(__file__).parent / ".env"
@@ -39,6 +41,11 @@ def get_embeddings():
     """Return a cached HuggingFaceEmbeddings instance."""
     global _embeddings
     if _embeddings is None:
+        # Configure TensorFlow to be less verbose
+        import logging
+        logging.getLogger('tensorflow').setLevel(logging.ERROR)
+        logging.getLogger('absl').setLevel(logging.ERROR)
+
         from langchain_huggingface import HuggingFaceEmbeddings
         _embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
     return _embeddings

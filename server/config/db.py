@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from server/.env
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 MONGO_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
 DB_NAME = os.getenv("MONGODB_DB_NAME", "mediguide")
@@ -44,11 +46,18 @@ try:
             MONGO_URI,
             tls=True,
             tlsCAFile=certifi.where(),
-            serverSelectionTimeoutMS=5000
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=20000,
         )
     else:
         # Local connection
-        client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        client = MongoClient(
+            MONGO_URI,
+            serverSelectionTimeoutMS=30000,
+            connectTimeoutMS=10000,
+            socketTimeoutMS=20000,
+        )
 
     # Test connection
     client.admin.command("ping")
